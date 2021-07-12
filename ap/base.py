@@ -34,8 +34,8 @@ ns = Namespace("api/task", description="операции")
 api = Api(app, version="1.0", title="Task", description="Планировщик задач")
 api.add_namespace(ns)
 
-todo = ns.model(
-    "Todo",
+task = ns.model(
+    "Task",
     {
         "id": fields.Integer(readonly=True, description="The task unique identifier"),
         "title": fields.String(required=True, description="The title task"),
@@ -44,16 +44,16 @@ todo = ns.model(
     },
 )
 
-todo_create = ns.model(
-    "Todo_create",
+task_create = ns.model(
+    "Task_create",
     {
         "title": fields.String(required=True, description="The title task"),
         "content": fields.String(required=True, description="Create date"),
     },
 )
 
-todo_list = ns.model(
-    "Todo_list",
+task_list = ns.model(
+    "Task_list",
     {
         "id": fields.Integer(readonly=True, description="The task unique identifier"),
         "title": fields.String(required=True, description="The title task"),
@@ -61,8 +61,8 @@ todo_list = ns.model(
     },
 )
 
-todo_details = ns.model(
-    "Todo_detail",
+task_detail = ns.model(
+    "Task_detail",
     {
         "title": fields.String(required=True, description="The title task"),
         "content": fields.String(required=True, description="Create date"),
@@ -71,7 +71,8 @@ todo_details = ns.model(
 )
 
 
-class Todo(db.Model):
+
+class Task(db.Model):
     __tablename__ = "tasks"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -80,29 +81,27 @@ class Todo(db.Model):
     create_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     def __repr__(self):
-        return f"<Todo title {self.title}>"
+        return f"<Task {self.title}>"
 
-    def todo_get_all(self):
-        tasks = Todo.query.all()
+    def get_all_task(self):
+        tasks = Task.query.all()
         results = [
-            {
-                "id": task.id,
-                "title": task.title,
-                "content": task.content,
-                "create_at": task.create_at,
-            }
-            for task in tasks
+            {"id": task.id, "title": task.title, "content": task.content, "create_at": task.create_at} for task in tasks
         ]
         return results
 
-    def todo_create(self, data):
-        head = Todo(title=data["title"], content=data["content"])
-        db.session.add(head)
+    def create_task(self, data):
+        task = Task(title=data["title"], content=data["content"])
+        db.session.add(task)
         db.session.commit()
-        return head
+        return task
 
-    def todo_update(self, id, data):
-        task = Todo.query.get_or_404(id)
+    def get_task(self, id):
+        task = Task.query.get_or_404(id)
+        return task
+
+    def update_task(self, id, data):
+        task = Task.query.get_or_404(id)
         if not "title" in data:
             abort(400)
         if not "content" in data:
@@ -113,51 +112,56 @@ class Todo(db.Model):
         db.session.commit()
         return task
 
-    def todo_delete(self, id):
-        task = Todo.query.get_or_404(id)
+    def delete_task(self, id):
+        task = Task.query.get_or_404(id)
         db.session.delete(task)
         db.session.commit()
-
-    def get_todo(self, id):
-        task = Todo.query.get_or_404(id)
-        return task
         
-DAO = Todo()
+DAO = Task()
 
 
 @ns.route("/")
 class TodoList(Resource):
+    """Shows a list of all todos, and lets you POST to add new tasks"""
+
     @ns.doc("list_todos")
-    @ns.marshal_list_with(todo_list)
+    @ns.marshal_list_with(task_list)
     def get(self):
-        return DAO.todo_get_all()
+        """List all tasks"""
+        return DAO.get_all_task()
 
     @ns.doc("create_todo")
-    @ns.expect(todo_create)
-    @ns.marshal_with(todo, code=201)
+    @ns.expect(task_create)
+    @ns.marshal_with(task, code=201)
     def post(self):
-        return DAO.todo_create(request.json), 201
+        """Create a new task"""
+        return DAO.create_task(request.json), 201
 
 
 @ns.route("/<int:id>")
 @ns.response(404, "Todo not found")
 @ns.param("id", "The task identifier")
-class Todos(Resource):
+class Todo(Resource):
+    """Show a single todo item and lets you delete them"""
+
     @ns.doc("get_todo")
-    @ns.marshal_with(todo_details)
+    @ns.marshal_with(task_detail)
     def get(self, id):
-        return DAO.get_todo(id)
+        """Fetch a given resource"""
+        return DAO.get_task(id)
 
     @ns.doc("delete_todo")
     @ns.response(204, "Todo deleted")
     def delete(self, id):
-        DAO.todo_delete(id)
+        """Delete a task given its identifier"""
+        DAO.delete_task(id)
         return "", 204
 
-    @ns.expect(todo)
-    @ns.marshal_with(todo)
+    @ns.expect(task_create)
+    @ns.marshal_with(task)
     def put(self, id):
-        return DAO.todo_update(id, request.json)
+        """Update a task given its identifier"""
+        return DAO.update_task(id, request.json)
 
 
 if __name__ == "__main__":
